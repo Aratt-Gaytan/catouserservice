@@ -24,7 +24,3 @@ def hello_world():
 def hello():
     return 'Everything is OK'
 
-
-if __name__ == "__main__":
-    
-    app.run(debug=True)
