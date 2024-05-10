@@ -1,8 +1,11 @@
-from flask import Flask # type: ignore
+from flask import Flask, logging # type: ignore
 import json
+from flask_cors import CORS, cross_origin
 from .users import user
 
 app = Flask(__name__)
+CORS(app, origins=['http://localhost:4200'], methods=['GET', 'POST', 'OPTIONS'])  # Allow specific origin and methods
+
 
 app.register_blueprint(user, url_prefix="/user")
 

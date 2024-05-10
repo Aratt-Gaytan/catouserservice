@@ -1,6 +1,8 @@
 # user.py (user module)
 from bson import ObjectId
 from flask import Blueprint, jsonify, request
+import logging
+# from flask_cors import CORS
 from pymongo import MongoClient
 
 # Cadena de conexión
@@ -14,6 +16,8 @@ db = cliente["catouserservice"]
 users = db["user"]
 
 user = Blueprint('user', __name__)  # Create a Blueprint named 'user'
+# user.logger.setLevel(logging.DEBUG)
+
 
 @user.route("/")
 def get_users():
@@ -25,16 +29,21 @@ def get_users():
     # Implement logic to retrieve users
     return jsonify(users_json)
 
-@user.route("/search/<user_email>")
-def get_user(user_email):
-    search_pattern = f".*{user_email}.*"  # Matches any characters before, after, or containing the email
-    email_regex = {"email": {"$regex": search_pattern, "$options": "i"}}  # Case-insensitive search
+@user.route("/search")
+def get_user():
+    search_pattern = f".*{request.args.get('search')}.*"
+    email_regex = {"email": {"$regex": search_pattern, "$options": "i"}}
+    name_regex = {"name": {"$regex": search_pattern, "$options": "i"}}
+    phone_regex = {"phone": {"$regex": search_pattern, "$options": "i"}}
+
+    # Combine search criteria into a logical OR query
+    query = {"$or": [email_regex, name_regex, phone_regex]}
 
     # Find users matching the email pattern using regex
-    userslist = users.find(email_regex)
+    userslist = users.find(query)
     users_json = []
     for user in userslist:
-        users_json.append({"_id": str(user["_id"]), "name": str(user["name"]), "email": str(user["email"]), "birth_date": str(user["birth_date"]), "password": str(user["password"]) })
+        users_json.append({"_id": str(user["_id"]), "name": str(user["name"]), "email": str(user["email"]), "birth_date": str(user["birth_date"]), "password": str(user["password"]), "phone": str(user["phone"]) })
     # Implement logic to retrieve users
     return jsonify(users_json)
 
@@ -45,39 +54,44 @@ def get_user_info(user_id):
     userslist = users.find({"_id": ObjectId(user_id)})
     users_json = []
     for user in userslist:
-        users_json.append({"_id": str(user["_id"]), "name": str(user["name"]), "email": str(user["email"]), "birth_date": str(user["birth_date"]), "password": str(user["password"]) })
+        users_json.append({"_id": str(user["_id"]), "name": str(user["name"]), "email": str(user["email"]), "birth_date": str(user["birth_date"]), "password": str(user["password"]), "phone": str(user["phone"]) })
     # Implement logic to retrieve users
     return jsonify(users_json)
-
 
 @user.route("/add", methods=["POST"])
 def add_user():
     try:
-        name = request.form["name"]
-        email = request.form["email"]
-        birth_date = request.form["birth_date"]
-        password = request.form["password"]
+        data = request.json  # Access data as JSON
 
-        if name or email or birth_date or password:
-            # Insertar la nueva tarea en la colección
-            users.insert_one({ 'name': name, 'email': email, 'birth_date': birth_date, 'password': password })
-        else:
-            return jsonify({"message": f"error"}) 
+        name = data.get("name")
+        email = data.get("email")
+        birth_date = data.get("birth_date")
+        password = data.get("password")
+        phone = data.get("phone")
+
+        try:
+            users.insert_one({ 'name': name, 'email': email, 'birth_date': birth_date, 'password': password, 'phone': phone })
+        except Exception as e:
+            return jsonify({"error": e})
 
         # Implement logic to retrieve a specific user
         return jsonify({"message": f"User added successfuly"})
-    except:
-        return jsonify({"message": f"error"})
+    except Exception as e:
+        print(f"An error occurred: {e}")  # Log the error for debugging
+        return jsonify({"error": f"The email {email} is already in use"})  # Return generic error message
  
 
 @user.route("/update", methods=["POST"])
 def update_user():
     try:
-        user_id = request.form.get("user_id")  # Use get() to handle optional parameter
-        name = request.form.get("name")
-        email = request.form.get("email")
-        birth_date = request.form.get("birth_date")
-        password = request.form.get("password")
+        data = request.json  # Access data as JSON
+
+        name = data.get("name")
+        email = data.get("email")
+        birth_date = data.get("birth_date")
+        password = data.get("password")
+        phone = data.get("phone")
+        user_id = data.get("user_id")
 
         # Validate user_id presence (optional, adjust based on your requirements)
         if not user_id:
@@ -94,6 +108,8 @@ def update_user():
             update_data["birth_date"] = birth_date
         if password:
             update_data["password"] = password
+        if phone:
+            update_data["phone"] = password
 
         # Check if update data is empty (all fields optional)
         if not update_data:
@@ -117,7 +133,11 @@ def update_user():
 @user.route("/delete", methods=["POST"])
 def delete_user():
     try:
-        user_id = request.form.get("user_id")
+        data = request.json  # Access data as JSON
+
+        user_id = data.get("id")
+        
+        print(user_id)
 
         # Validate user_id presence (optional, adjust based on your requirements)
         if not user_id:
